@@ -14,7 +14,7 @@ def generate_future_reservations():
     )
     
     for reservation in active_reservations:
-        # بررسی نیاز به تولید رزروهای جدید
+        #dd بررسی نیاز به تولید رزروهای جدید
         last_reservation = reservation.generated_reservations.order_by('-reservation_date').first()
         
         if not last_reservation or last_reservation.reservation_date < date.today() + timedelta(days=7):

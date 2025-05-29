@@ -87,9 +87,10 @@ class SportFacilityAdmin(ModelAdmin):
     
     @display(description="قیمت ساعتی", ordering="hourly_price")
     def display_hourly_price(self, obj):
+        formatted_price = f"{int(obj.hourly_price):,}"
         return format_html(
-            '<span class="badge badge-success">{:,} تومان</span>',
-            int(obj.hourly_price)
+            '<span class="badge badge-success">{} تومان</span>',
+            formatted_price
         )
     
     @display(description="امتیاز")
@@ -190,31 +191,43 @@ class SessionTimeAdmin(ModelAdmin):
             obj.start_time.strftime('%H:%M'),
             obj.end_time.strftime('%H:%M')
         )
-    
+
     @display(description="وضعیت ظرفیت")
     def display_capacity_status(self, obj):
         today = timezone.now().date()
-        remaining = obj.get_remaining_capacity(today)
-        percentage = (remaining / obj.capacity) * 100 if obj.capacity > 0 else 0
-        
-        if percentage > 70:
+        remaining = obj.get_remaining_capacity(today)  # فرض می‌کنیم این متد یک عدد برمی‌گرداند
+
+        if obj.capacity and obj.capacity > 0:
+            percentage_val = (remaining / obj.capacity) * 100
+        else:
+            percentage_val = 0
+
+        if percentage_val > 70:
             badge_class = "badge-success"
-        elif percentage > 30:
+        elif percentage_val > 30:
             badge_class = "badge-warning"
         else:
             badge_class = "badge-danger"
-        
+
+        # 1. عدد درصد را به رشته با فرمت دلخواه تبدیل کنید
+        formatted_percentage_str = "{:.0f}".format(percentage_val)
+
+        # 2. رشته فرمت‌شده را به format_html پاس دهید و از {} استفاده کنید
         return format_html(
-            '<span class="badge {}">{}/{} ({:.0f}%)</span>',
-            badge_class, remaining, obj.capacity, percentage
+            '<span class="badge {}">{}/{} ({}%)</span>',  # {:.0f} به {} تغییر کرد
+            badge_class,
+            remaining,
+            obj.capacity,
+            formatted_percentage_str  # پاس دادن رشته از قبل فرمت‌شده
         )
-    
     @display(description="قیمت")
     def display_price(self, obj):
         price = obj.get_price()
+        formatted_price_str = f"{int(price):,}"
+
         return format_html(
-            '<span class="badge badge-success">{:,} تومان</span>',
-            int(price)
+            '<span class="badge badge-success">{} تومان</span>',
+            formatted_price_str
         )
     
     @display(description="جزئیات قیمت‌گذاری")
@@ -478,7 +491,7 @@ class DiscountAdmin(ModelAdmin):
         if obj.discount_type == 'percentage':
             return format_html('<span class="badge badge-success">{}%</span>', obj.amount)
         else:
-            return format_html('<span class="badge badge-success">{:,} تومان</span>', int(obj.amount))
+            return format_html('<span class="badge badge-success">{} تومان</span>', int(obj.amount))
     
     @display(description="اعتبار")
     def display_validity(self, obj):
@@ -502,12 +515,16 @@ class DiscountAdmin(ModelAdmin):
             else:
                 badge_class = "badge-success"
             
+            formatted_count = f"{obj.used_count}"
+            formatted_limit = f"{obj.usage_limit}"
+            formatted_percentage = f"{int(percentage)}"
             return format_html(
                 '<span class="badge {}">{}/{} ({}%)</span>',
-                badge_class, obj.used_count, obj.usage_limit, int(percentage)
+                badge_class, formatted_count, formatted_limit, formatted_percentage
             )
         else:
-            return format_html('<span class="badge badge-info">{} بار</span>', obj.used_count)
+            formatted_count = f"{obj.used_count}"
+            return format_html('<span class="badge badge-info">{} بار</span>', formatted_count)
 
 @admin.register(Reservation)
 class ReservationAdmin(ModelAdmin):
@@ -594,25 +611,32 @@ class ReservationAdmin(ModelAdmin):
     @display(description="قیمت")
     def display_prices(self, obj):
         if obj.discount_amount > 0:
+            formatted_original = f"{int(obj.original_price):,}"
+            formatted_final = f"{int(obj.final_price):,}"
             return format_html(
-                '<del>{:,}</del><br><strong>{:,} تومان</strong>',
-                int(obj.original_price),
-                int(obj.final_price)
+                '<del>{}</del><br><strong>{} تومان</strong>',
+                formatted_original,
+                formatted_final
             )
         else:
-            return format_html('<strong>{:,} تومان</strong>', int(obj.final_price))
+            formatted_final = f"{int(obj.final_price):,}"
+            return format_html('<strong>{} تومان</strong>', formatted_final)
     
     @display(description="جزئیات قیمت")
     def display_price_breakdown(self, obj):
         if not obj.pk:
             return "-"
         
+        formatted_original = f"{int(obj.original_price):,}"
+        formatted_discount = f"{int(obj.discount_amount):,}"
+        formatted_final = f"{int(obj.final_price):,}"
+        
         html = f'''
         <div class="price-breakdown">
             <table class="table table-sm">
                 <tr>
                     <td>قیمت پایه:</td>
-                    <td>{int(obj.original_price):,} تومان</td>
+                    <td>{formatted_original} تومان</td>
                 </tr>
         '''
         
@@ -620,21 +644,21 @@ class ReservationAdmin(ModelAdmin):
             html += f'''
                 <tr>
                     <td>تخفیف ({obj.discount.name}):</td>
-                    <td class="text-danger">- {int(obj.discount_amount):,} تومان</td>
+                    <td class="text-danger">- {formatted_discount} تومان</td>
                 </tr>
             '''
         elif obj.recurring_reservation and obj.recurring_reservation.package:
             html += f'''
                 <tr>
                     <td>تخفیف پکیج:</td>
-                    <td class="text-danger">- {int(obj.discount_amount):,} تومان</td>
+                    <td class="text-danger">- {formatted_discount} تومان</td>
                 </tr>
             '''
         
         html += f'''
                 <tr class="font-weight-bold">
                     <td>قیمت نهایی:</td>
-                    <td>{int(obj.final_price):,} تومان</td>
+                    <td>{formatted_final} تومان</td>
                 </tr>
             </table>
         </div>
